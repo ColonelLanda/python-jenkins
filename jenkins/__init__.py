@@ -53,6 +53,7 @@ import socket
 import sys
 import time
 import warnings
+import ssl
 
 import multi_key_dict
 import six
@@ -255,7 +256,7 @@ class Jenkins(object):
     _timeout_warning_issued = False
 
     def __init__(self, url, username=None, password=None,
-                 timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+                 timeout=socket._GLOBAL_DEFAULT_TIMEOUT, ignore_certs_validation=None):
         '''Create handle to Jenkins instance.
 
         All methods will raise :class:`JenkinsException` on failure.
@@ -275,6 +276,12 @@ class Jenkins(object):
             self.auth = None
         self.crumb = None
         self.timeout = timeout
+        if ignore_certs_validation:
+            self.ssl_ctx = ssl.create_default_context()
+            self.ssl_ctx.check_hostname = False
+            self.ssl_ctx.verify_mode = ssl.CERT_NONE
+        else :
+            self.ssl_ctx = None
 
     def _get_encoded_params(self, params):
         for k, v in params.items():
@@ -428,7 +435,7 @@ class Jenkins(object):
                 req.add_header('Authorization', self.auth)
             if add_crumb:
                 self.maybe_add_crumb(req)
-            response = urlopen(req, timeout=self.timeout).read()
+            response = urlopen(req, timeout=self.timeout, context=self.ssl_ctx).read()
             if response is None:
                 raise EmptyResponseException(
                     "Error communicating with server[%s]: "
@@ -599,7 +606,7 @@ class Jenkins(object):
         try:
             request = Request(self._build_url(''))
             request.add_header('X-Jenkins', '0.0')
-            response = urlopen(request, timeout=self.timeout)
+            response = urlopen(request, timeout=self.timeout, context=self.ssl_ctx)
             if response is None:
                 raise EmptyResponseException(
                     "Error communicating with server[%s]: "
